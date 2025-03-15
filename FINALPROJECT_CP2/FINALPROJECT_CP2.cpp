@@ -430,8 +430,7 @@ int main()
 		}
 	} while (choice != 'I');
 
-	cout << "Trial";
-
+	
 	return 0;
 
 }
