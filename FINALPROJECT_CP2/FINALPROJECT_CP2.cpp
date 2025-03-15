@@ -382,7 +382,7 @@ int main()
 
 
 
-		switch (choice)
+		switch (toupper(choice))
 		{
 		case 'A':                                                                            //Call sales report function
 			generateSalesReport(salesHead, productList.head);
@@ -412,6 +412,7 @@ int main()
 			getline(cin, productName);
 			cout << "\n";
 			Product* foundProduct = searchProduct(productList.head, productName);
+			cout << "\n===========================================\n\n";
 		}
 		break;
 		case 'G':
