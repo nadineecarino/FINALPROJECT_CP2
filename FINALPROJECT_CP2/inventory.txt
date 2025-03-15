@@ -1,0 +1,8 @@
+Product Name     ID     Price    Stock
+--------------------------------------
+Syrup          106   100.00   20    
+Ice            105   59.00    20    
+Chocolate      104   100.00   20    
+Whipped Cream  103   100.00   20    
+Milk           102   89.00    20    
+Coffee         101   120.00   10    
