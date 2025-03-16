@@ -65,6 +65,8 @@ struct SalesNode
 
 
 
+
+
 // Linked List for products
 class ProductList
 {public:
@@ -92,17 +94,32 @@ static void saveInventoryToFile(ProductList& productList)
 		return;
 	}
 
-	// Write table header
-	outFile << "Product Name     ID     Price    Stock\n";
-	outFile << "--------------------------------------\n";
+	//Write table header
+	outFile << left << "--------------------------------------------------------\n";
+	outFile << left << setw(15) << "Product Name"
+		<< setw(6) << "ID"
+		<< setw(9) << "Price"
+		<< setw(8) << "Stock"
+		<< "Supplier\n";
+	outFile << left << "--------------------------------------------------------\n"; 
+	
 
 	Product* currentProduct = productList.head;
 	while (currentProduct != nullptr)
 	{
+		string supplierName;
+		if (currentProduct->supplierList != nullptr) {
+			supplierName = currentProduct->supplierList->supplierName;
+		}
+		else {
+			supplierName = "N/A";
+		}
+
 		outFile << left << setw(15) << currentProduct->productName
 			<< setw(6) << currentProduct->productId
 			<< setw(9) << fixed << setprecision(2) << currentProduct->productPrice
-			<< setw(6) << currentProduct->productStock << "\n";
+			<< setw(8) << currentProduct->productStock
+			<< setw(20) << supplierName << "\n";
 
 		currentProduct = currentProduct->next;
 	}
@@ -110,6 +127,10 @@ static void saveInventoryToFile(ProductList& productList)
 	outFile.close();
 	cout << "Inventory data saved successfully.\n";
 }
+
+
+
+
 
 
 // Function to load inventory data from a file
@@ -131,6 +152,8 @@ static void loadInventoryFromFile(ProductList& productList)
 	inFile.close();
 	cout << "Inventory data loaded successfully.\n";
 }
+
+
 
 // Function to load inventory from a file
 static void loadInventory(ProductList& productList) {
@@ -163,6 +186,8 @@ static void loadInventory(ProductList& productList) {
 	cout << "Inventory loaded successfully.\n";
 }
 
+
+
 //Function to delete a product
 static void deleteProduct(ProductList &productList, int id) {
     Product* current = productList.head;
@@ -178,10 +203,14 @@ static void deleteProduct(ProductList &productList, int id) {
             }
             delete current; 
             cout << "Product deleted successfully!\n";
+
+			saveInventoryToFile(productList); 
             return; 
         }
         previous = current; 
         current = current->next; 
+
+		 
     }
     cout << "Product ID not found!\n";
 }
@@ -214,6 +243,7 @@ static void displayTotalSales(SalesNode* head) {
 
 
 
+
 // Function to search for a product by name in the inventory
 static Product* searchProduct(Product* head, const string& name) {
 	Product* current = head;
@@ -231,6 +261,9 @@ static Product* searchProduct(Product* head, const string& name) {
 	return nullptr; // Product not found
 }
 
+
+
+
 // Function for displaying remaining stock for each product	
 static void displayAllStock(Product * head) {
 		if (!head) {
@@ -244,6 +277,7 @@ static void displayAllStock(Product * head) {
 			current = current->next;
 		}
 }
+
 
 
 
@@ -285,6 +319,93 @@ static void generateSalesReport(SalesNode* salesHead, Product* productHead) {
 	showOutOfStock(productHead);
 	cout << "=======================" << endl;
 }
+
+
+
+// Function to display all products
+static void displayProducts(Product* head) {
+	if (!head) {
+		cout << "No products in inventory.\n";
+		return;
+	}
+	cout << left << setw(10) << "ID" << setw(25) << "Name"
+		<< setw(10) << "Price" << setw(10) << "Stock" << "Supplier\n";
+	cout << "----------------------------------------------------------\n";
+
+	while (head) {
+		cout << left << setw(10) << head->productId << setw(25) << head->productName
+			<< setw(10) << head->productPrice << setw(10) << head->productStock;
+
+		// If there is a supplier, print the first one
+		if (head->supplierList) {
+			cout << head->supplierList->supplierName;
+		}
+		else {
+			cout << "None";
+		}
+
+		cout << endl;
+		head = head->next;
+	}
+}
+
+
+
+// Function to track sales and update inventory (including adding stock)
+static void trackSales(ProductList& productList) {
+	int productId, quantity, choice;
+
+	
+	cout << "\nChoose an action:\n";
+	cout << "1. Record a Sale (Reduce Stock)\n";
+	cout << "2. Add Stock\n";
+	cout << "Enter choice: ";
+	cin >> choice;
+
+	if (choice != 1 && choice != 2) {
+		cout << "Invalid choice! Please select 1 or 2.\n";
+		return;
+	}
+
+	
+	cout << "Enter Product ID: ";
+	cin >> productId;
+
+	Product* current = productList.head;
+	while (current) {
+		if (current->productId == productId) {
+			if (choice == 1) {  // Track sales (Reduce stock)
+				cout << "Enter quantity sold: ";
+				cin >> quantity;
+
+				if (quantity > current->productStock) {
+					cout << "Error: Not enough stock available\n";
+					return;
+				}
+				current->productStock -= quantity;
+				cout << "Sale recorded. Remaining stock: " << current->productStock << endl;
+			}
+			else if (choice == 2) {  // Add stock
+				cout << "Enter quantity to add: ";
+				cin >> quantity;
+
+				if (quantity < 0) {
+					cout << "Error: Cannot add negative stock.\n";
+					return;
+				}
+				current->productStock += quantity;
+				cout << "Stock updated. New stock: " << current->productStock << endl;
+			}
+
+			saveInventoryToFile(productList); // Save updated inventory
+			return;
+		}
+		current = current->next;
+	}
+	cout << "Product not found!\n";
+}
+
+
 
 int main()
 {
@@ -353,6 +474,9 @@ int main()
 		else if (temp->productName == "Ice") {
 			temp->addSupplier("Cool Ice Suppliers", 998877665);
 		}
+		else if (temp->productName == "Syrup") {
+			temp->addSupplier("Sweet Syrup Suppliers", 912345566);
+		}
 		temp = temp->next;
 	}
 
@@ -387,8 +511,13 @@ int main()
 		case 'A':                                                                            //Call sales report function
 			generateSalesReport(salesHead, productList.head);
 			break;
-		case 'B':                                                                           // Call search product function
-
+		case 'B':                                                                            // Track sales and update inventory                                              
+		{
+			cout << "\n\n===========================================\n";
+			cout << "Track Sales & Update Inventory:\n\n";
+			trackSales(productList);                                                        
+			cout << "\n===========================================\n\n";
+		}
 			break;
 		case 'C':
 
@@ -396,13 +525,16 @@ int main()
 		case 'D':
 
 			break;
-		case 'E':
+		case 'E':                                                                         // Call delete function
+		{
 			int productId;
+			cout << "\n\n===========================================\n";
 			cout << "Enter the Product ID to delete: ";
 			cin >> productId;
+			cout << "\n===========================================\n\n";
 
-			deleteProduct(productList, productId);                                          // Call delete function
-			saveInventoryToFile(productList);                                               // Save updated inventory
+			deleteProduct(productList, productId);
+		}
 			break;
 		case 'F':                                                                          // Call search product function
 		{
@@ -416,7 +548,12 @@ int main()
 		}
 		break;
 		case 'G':
-
+		{
+			cout << "\n\n===========================================\n";
+			cout << "Displaying All Products:\n\n";
+			displayProducts(productList.head);
+			cout << "\n===========================================\n\n";
+		}
 			break;
 		case 'H':
 
