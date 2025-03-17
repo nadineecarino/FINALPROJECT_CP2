@@ -1,15 +1,18 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <fstream>
 #include <iomanip>
+# include <limits>                      // Added for input validation
 using namespace std;
 
 // Temporary arrays to store product details before using a linked list
 string productNames[100]; 
 int productIds[100];       
 double productPrices[100]; 
-int productStocks[100];    
+int productStocks[100]; 
+double productSale; 
 int productCount = 0; // Counter to track the number of products added to temporary storage.
+ 
 
 
 // Struct for Supplier Information
@@ -25,13 +28,13 @@ struct Supplier
 	}
 };
 
-
 // Struct for Product Information
 struct Product {
 	string productName;
 	int productId;
 	double productPrice;
 	int productStock;
+	double totalSales;
 	Supplier* supplierList;        // Pointer to a linked list of suppliers
 	Product* next;                 // Pointer to the next product in the linked list
 
@@ -40,6 +43,7 @@ struct Product {
 		productId = id;
 		productPrice = price;
 		productStock = stock;
+		totalSales = 0;
 		supplierList = nullptr; // No suppliers linked initially.
 		next = nullptr;
 	}
@@ -62,6 +66,7 @@ struct SalesNode
 	}
 };
 
+SalesNode* salesHead = nullptr;  // Head of sales linked list
 
 
 
@@ -77,86 +82,46 @@ class ProductList
 	}
 };
 
-
-
-
-
-
-
-
 // Function to save inventory details to file
-static void saveInventoryToFile(ProductList& productList)
-{
+
+static void saveInventoryToFile(ProductList& productList) {
 	ofstream outFile("inventory.txt");
-	if (!outFile)
-	{
+	if (!outFile) {
 		cout << "Error opening file for writing!" << endl;
 		return;
 	}
 
-	//Write table header
-	outFile << left << "--------------------------------------------------------\n";
-	outFile << left << setw(15) << "Product Name"
-		<< setw(6) << "ID"
-		<< setw(9) << "Price"
-		<< setw(8) << "Stock"
-		<< "Supplier\n";
-	outFile << left << "--------------------------------------------------------\n"; 
-	
+	// Table Header
+	outFile << left << setw(20) << "Product Name"
+		<< setw(10) << "ID"
+		<< setw(10) << "Price"
+		<< setw(10) << "Stock"
+		<< setw(25) << "Supplier Name"
+		<< setw(20) << "Phone No."
+		<< endl;
+	outFile << string(85, '-') << endl; // Horizontal line
 
-	Product* currentProduct = productList.head;
-	while (currentProduct != nullptr)
-	{
-		string supplierName;
-		if (currentProduct->supplierList != nullptr) {
-			supplierName = currentProduct->supplierList->supplierName;
+	// Writing Product Details
+	Product* current = productList.head;
+	while (current != nullptr) {
+		if (current->supplierList) {
+			outFile << left << setw(20) << current->productName
+				<< setw(10) << current->productId
+				<< setw(10) << fixed << setprecision(2) << current->productPrice
+				<< setw(10) << current->productStock
+				<< setw(25) << current->supplierList->supplierName
+				<< setw(20) << current->supplierList->supplierPhone
+				<< endl;
 		}
-		else {
-			supplierName = "N/A";
-		}
-
-		outFile << left << setw(15) << currentProduct->productName
-			<< setw(6) << currentProduct->productId
-			<< setw(9) << fixed << setprecision(2) << currentProduct->productPrice
-			<< setw(8) << currentProduct->productStock
-			<< setw(20) << supplierName << "\n";
-
-		currentProduct = currentProduct->next;
+		current = current->next;
 	}
 
 	outFile.close();
 	cout << "Inventory data saved successfully.\n";
 }
 
-
-
-
-
-
-// Function to load inventory data from a file
-static void loadInventoryFromFile(ProductList& productList)
-{   ifstream inFile("inventory.txt");
-	if (!inFile) 
-	{   cout << "No existing inventory file found.\n";
-		return;
-	}
-
-	string name;
-	int id, stock;
-	double price;
-	while (inFile >> name >> id >> price >> stock) 
-	{   Product* newProduct = new Product(name, id, price, stock);
-		newProduct->next = productList.head;
-		productList.head = newProduct;
-	}
-	inFile.close();
-	cout << "Inventory data loaded successfully.\n";
-}
-
-
-
 // Function to load inventory from a file
-static void loadInventory(ProductList& productList) {
+static void loadInventoryFromFile(ProductList& productList) {
 	ifstream inFile("inventory.txt");
 	if (!inFile) {
 		cout << "No existing inventory file found. Creating a new one.\n";
@@ -165,19 +130,20 @@ static void loadInventory(ProductList& productList) {
 	}
 
 	string name;
-	int id, stock;
-	double price;
-	char comma;
+	int id = 0, stock = 0;
+	double price = 0.0, sales = 0.0;
 
-	while (inFile >> ws, getline(inFile, name, ',')) {
-		if (!(inFile >> id >> comma >> price >> comma >> stock)) {
-			cout << "Error: Invalid file format. Skipping line.\n";
-			inFile.clear();
-			inFile.ignore(1000, '\n');
-			continue;
-		}
+	while (getline(inFile, name, ',')) { 
+		inFile >> id;
+		inFile.ignore();
+		inFile >> price;
+		inFile.ignore();
+		inFile >> stock;
+		inFile.ignore();
+		inFile >> sales;
 
 		Product* newProduct = new Product(name, id, price, stock);
+		newProduct->totalSales = sales; 
 		newProduct->next = productList.head;
 		productList.head = newProduct;
 	}
@@ -187,6 +153,287 @@ static void loadInventory(ProductList& productList) {
 }
 
 
+
+
+// Function to print total sales with highest and lowest selling products
+static void printSalesSummary(Product* head) {
+	if (!head) {
+		cout << "No products available.\n";
+		return;
+	}
+
+	double totalSales = 0;
+	double highestSale = 0, lowestSale = 1e9;
+	string highestProduct = "None", lowestProduct = "None";
+	bool hasSales = false;
+
+	cout << "\n==== Sales Summary ====\n";
+	Product* current = head;
+	while (current) {
+		if (current->totalSales > 0) {  // Ensure we count only sold items
+			hasSales = true;
+			totalSales += current->totalSales;
+
+			if (current->totalSales > highestSale) {
+				highestSale = current->totalSales;
+				highestProduct = current->productName; 
+			}
+			if (current->totalSales < lowestSale) {
+				lowestSale = current->totalSales;
+				lowestProduct = current->productName; 
+			}
+		}
+		current = current->next;
+	}
+
+	// Display Sales Summary
+	current = head;
+	cout << "\nProduct Sales Breakdown:\n";
+	cout << "------------------------------------\n";
+	while (current) {
+		cout << "Product: " << current->productName << " | Total Sales: Php " << current->totalSales << endl;
+		current = current->next;
+	}
+
+	cout << "------------------------------------\n";
+	if (!hasSales) {
+		cout << "No sales recorded yet.\n";
+	}
+	else {
+		cout << "Overall Total Sales: Php" << totalSales << endl;
+		cout << "Highest Selling Product: " << highestProduct << " (Php" << highestSale << ")\n";
+		cout << "Lowest Selling Product: " << lowestProduct << " (Php" << lowestSale << ")\n";
+	}
+}
+
+// Function to display all products with stock
+static void displayAllStock(Product* head) {
+	if (!head) {
+		cout << "No products in inventory.\n";
+		return;
+	}
+
+	cout << "\n==== Product Stock List ====\n";
+	Product* current = head;
+	while (current) {
+		cout << "Product: " << current->productName << " | Stock: " << current->productStock << endl;
+		current = current->next;
+	}
+}
+
+// Function to display only out-of-stock products
+static void showOutOfStock(Product* head) {
+	if (!head) {
+		cout << "No products in the inventory.\n";
+		return;
+	}
+
+	bool anyOutOfStock = false;
+	Product* current = head;
+
+	cout << "\n==== Out of Stock Products ====\n";
+	while (current) {
+		if (current->productStock == 0) {
+			cout << current->productName << " is OUT OF STOCK.\n";
+			anyOutOfStock = true;
+		}
+		current = current->next;
+	}
+
+	if (!anyOutOfStock) {
+		cout << "All products are available.\n";
+	}
+}
+
+// Function to generate and display sales report
+static void generateSalesReport(ProductList& productList) {
+	int choice = 0;
+
+	cout << "\n==== Cafe Sales Report ====\n";
+	cout << "1. Display Total Sales\n";
+	cout << "2. Display All Products with Stock\n";
+	cout << "3. Display Out of Stock Products\n";
+	cout << "Enter choice: ";
+
+	while (!(cin >> choice) || choice < 1 || choice > 3) {  // Input validation
+		cout << "Invalid choice! Please select 1, 2, or 3: ";
+		cin.clear();
+		cin.ignore(numeric_limits<streamsize>::max(), '\n');
+	}
+
+	switch (choice) {
+	case 1:
+		printSalesSummary(productList.head);
+		break;
+	case 2:
+		displayAllStock(productList.head);
+		break;
+	case 3:
+		showOutOfStock(productList.head);
+		break;
+	}
+}
+
+
+
+
+
+
+
+
+
+// Function to record sales  
+static void trackSales(ProductList& productList) {
+	int productId, quantity;
+	double totalAmount;
+	cout << "Record a Sale (Reduce Stock)\n";
+	
+
+	cout << "Enter Product ID: ";
+	cin >> productId;
+
+	Product* current = productList.head;
+	while (current) {
+		if (current->productId == productId) 
+		{
+			  // Track sales (Reduce stock)
+				cout << "Enter quantity sold: ";
+				cin >> quantity;
+
+				if (quantity > current->productStock) {
+					cout << "Error: Not enough stock available\n";
+					return;
+				}
+				current->productStock -= quantity;
+				totalAmount = quantity * current->productPrice;
+				cout << "Sale recorded. Remaining stock: " << current->productStock << endl;
+
+				
+				// Add sale record to linked list
+				SalesNode* newSale = new SalesNode(totalAmount);
+				newSale->next = salesHead;
+				salesHead = newSale;
+		
+			saveInventoryToFile(productList); // Save updated inventory
+			return;
+		}
+		current = current->next;
+	}
+	cout << "Product not found!\n";
+	return;
+}
+
+//Function to update product information
+static void updateProduct(ProductList& productList) {
+	int id = 0;
+	cout << "Enter Product ID to update: ";
+	cin >> id; 
+	Product* current = productList.head;
+	while (current != nullptr) {
+		
+		if (current->productId == id) {
+			cout << "Updating product: " << current->productName << endl;
+			cout << "Enter new name: ";
+			string newName;
+			cin.ignore();
+			getline(cin, newName);
+			if (!newName.empty()) {
+				current->productName = newName;
+			}
+
+			cout << "Enter new price: ";
+			double newPrice;
+			cin >> newPrice;
+			if (newPrice >= 0) {
+				current->productPrice = newPrice;
+			}
+
+			cout << "Enter new stock: ";
+			int newStock;
+			cin >> newStock;
+			if (newStock >= 0) {
+				current->productStock = newStock;
+			}
+
+			// Save updated inventory to file
+			saveInventoryToFile(productList);
+		}
+		current = current->next;
+	}
+	cout << "Product ID not found!\n";
+}
+
+// Function to check if a product ID already exists
+static bool isProductIdUnique(ProductList& productList, int id) {
+	Product* current = productList.head;
+	while (current != nullptr) {
+		if (current->productId == id) {
+			return false; // ID already exists
+		}
+		current = current->next;
+	}
+	return true; // ID is unique
+}
+// Function to add product
+static void addProduct(ProductList& productList)
+{
+	ofstream inFile("inventory.txt", ios::app);
+	if (!inFile) {
+		cout << "No existing inventory file found.\n";
+		return;
+	}
+
+	string supplierName;
+	int supplierNumber;
+
+	Product* newProduct = new Product("", 0, 0.0, 0);  
+
+	cout << "ADD NEW PRODUCT" << endl;
+	cout << "Product Name: ";
+	cin >> ws;
+	getline(cin, newProduct->productName);
+	do {
+		cout << "ID: ";
+		cin >> newProduct->productId;
+		if (!isProductIdUnique(productList, newProduct->productId)) {
+			cout << "Error: Product ID already exists! Please enter a unique ID.\n";
+		}
+	} while (!isProductIdUnique(productList, newProduct->productId));
+	
+	cout << "Price: ";
+	cin >> newProduct->productPrice;
+	cout << "Stock: ";
+	cin >> newProduct->productStock;
+	cout << "Supplier Name: ";
+	cin.ignore();
+	getline(cin, supplierName);
+	cout << "\nPhone No.: ";
+	cin >> supplierNumber;
+
+	
+
+	newProduct->addSupplier(supplierName, supplierNumber);
+	newProduct->next = productList.head;                        // Add new product to the linked list
+	productList.head = newProduct;
+	saveInventoryToFile(productList);
+
+	cout << "Product added successfully!\n";
+
+
+	inFile << left << setw(20) << newProduct->productName         // Save to file with proper table alignment
+		<< setw(10) << newProduct->productId
+		<< setw(10) << fixed << setprecision(2) << newProduct->productPrice
+		<< setw(10) << newProduct->productStock
+		<< setw(20) << supplierName
+		<< setw(15) << supplierNumber
+		<< endl;
+
+	inFile.close();
+
+	saveInventoryToFile(productList);
+	cout << "Product added successfully!\n";
+
+} 
 
 //Function to delete a product
 static void deleteProduct(ProductList &productList, int id) {
@@ -215,35 +462,6 @@ static void deleteProduct(ProductList &productList, int id) {
     cout << "Product ID not found!\n";
 }
 
-
-
-// Function to calculate and display total sales
-static void displayTotalSales(SalesNode* head) {
-	if (!head) {
-		cout << "No sales records available." << endl;
-		return;
-	}
-
-	double totalSales = 0, min = head->amount, max = head->amount;
-	int count = 0;
-
-	SalesNode* current = head;
-	while (current) {
-		totalSales += current->amount;   // Add sale amount to total
-		if (current->amount < min) min = current->amount;  // Update min sale
-		if (current->amount > max) max = current->amount;  // Update max sale
-		count++;  // Increase sale count
-		current = current->next;  // Move to next sale
-	}
-
-	cout << "\nTotal Sales: " << totalSales << endl;
-	cout << "Lowest Sale: " << min << endl;
-	cout << "Highest Sale: " << max << endl;
-}
-
-
-
-
 // Function to search for a product by name in the inventory
 static Product* searchProduct(Product* head, const string& name) {
 	Product* current = head;
@@ -261,149 +479,41 @@ static Product* searchProduct(Product* head, const string& name) {
 	return nullptr; // Product not found
 }
 
-
-
-
-// Function for displaying remaining stock for each product	
-static void displayAllStock(Product * head) {
-		if (!head) {
-			cout << "No products in inventory." << endl;
-			return;
-		}
-		cout << "\nRemaining Stock:\n";
-		Product* current = head;
-		while (current) {
-			cout << current->productName << " | Stock: " << current->productStock << endl;
-			current = current->next;
-		}
-}
-
-
-
-
-// Function to check and display out-of-stock products
-static void showOutOfStock(Product* head) {
-	if (!head) {
-		cout << "No products in the inventory." << endl;
-		return;
-	}
-
-	bool anyOutOfStock = false;
-	Product* current = head;
-
-	while (current) {
-		if (current->productStock == 0) {
-			cout << current->productName << " is OUT OF STOCK." << endl;
-			anyOutOfStock = true;
-		}
-		current = current->next;
-	}
-	if (!anyOutOfStock) {
-		cout << "All products are available." << endl;
-	}
-}
-
-
-
-// Function to generate a total sales report
-static void generateSalesReport(SalesNode* salesHead, Product* productHead) {
-	cout << "\n===== SALES REPORT =====" << endl;
-	displayTotalSales(salesHead);                                                // Display total sales
-	cout << "----------------------" << endl;
-
-	cout << "\nRemaining Stock:" << endl; 
-	displayAllStock(productHead);                                                // Display remaining stock
-	cout << "----------------------" << endl;
-
-	cout << "\nOut of Stock Products:" << endl;                                   // Display out-of-stock products
-	showOutOfStock(productHead);
-	cout << "=======================" << endl;
-}
-
-
-
-// Function to display all products
-static void displayProducts(Product* head) {
-	if (!head) {
-		cout << "No products in inventory.\n";
-		return;
-	}
-	cout << left << setw(10) << "ID" << setw(25) << "Name"
-		<< setw(10) << "Price" << setw(10) << "Stock" << "Supplier\n";
-	cout << "----------------------------------------------------------\n";
-
-	while (head) {
-		cout << left << setw(10) << head->productId << setw(25) << head->productName
-			<< setw(10) << head->productPrice << setw(10) << head->productStock;
-
-		// If there is a supplier, print the first one
-		if (head->supplierList) {
-			cout << head->supplierList->supplierName;
-		}
-		else {
-			cout << "None";
-		}
-
-		cout << endl;
-		head = head->next;
-	}
-}
-
-
-
-// Function to track sales and update inventory (including adding stock)
-static void trackSales(ProductList& productList) {
-	int productId, quantity, choice;
-
-	
-	cout << "\nChoose an action:\n";
-	cout << "1. Record a Sale (Reduce Stock)\n";
-	cout << "2. Add Stock\n";
-	cout << "Enter choice: ";
-	cin >> choice;
-
-	if (choice != 1 && choice != 2) {
-		cout << "Invalid choice! Please select 1 or 2.\n";
-		return;
-	}
-
-	
-	cout << "Enter Product ID: ";
-	cin >> productId;
+//Function to display the products
+static void displayProducts(ProductList& productList) {
+	cout << "\nINVENTORY\n";
+	cout << string(85, '-') << endl; // Horizontal line
+	cout << left << setw(20) << "Product Name"
+		<< setw(10) << "ID"
+		<< setw(10) << "Price"
+		<< setw(10) << "Stock"
+		<< setw(25) << "Supplier Name"
+		<< setw(20) << "Phone No."
+		<< endl;
+	cout << string(85, '-') << endl; // Horizontal line
 
 	Product* current = productList.head;
-	while (current) {
-		if (current->productId == productId) {
-			if (choice == 1) {  // Track sales (Reduce stock)
-				cout << "Enter quantity sold: ";
-				cin >> quantity;
-
-				if (quantity > current->productStock) {
-					cout << "Error: Not enough stock available\n";
-					return;
-				}
-				current->productStock -= quantity;
-				cout << "Sale recorded. Remaining stock: " << current->productStock << endl;
-			}
-			else if (choice == 2) {  // Add stock
-				cout << "Enter quantity to add: ";
-				cin >> quantity;
-
-				if (quantity < 0) {
-					cout << "Error: Cannot add negative stock.\n";
-					return;
-				}
-				current->productStock += quantity;
-				cout << "Stock updated. New stock: " << current->productStock << endl;
-			}
-
-			saveInventoryToFile(productList); // Save updated inventory
-			return;
+	while (current != nullptr) {
+		if (current->supplierList) {
+			cout << left << setw(20) << current->productName
+				<< setw(10) << current->productId
+				<< setw(10) << fixed << setprecision(2) << current->productPrice
+				<< setw(10) << current->productStock
+				<< setw(25) << current->supplierList->supplierName
+				<< setw(20) << current->supplierList->supplierPhone
+				<< endl;
 		}
 		current = current->next;
 	}
-	cout << "Product not found!\n";
+
+	cout << string(85, '-') << endl; // Horizontal line
 }
+
+
+
+
+
+
 
 
 
@@ -483,12 +593,12 @@ int main()
 
 	//Main Menu System
 	saveInventoryToFile(productList);
-	loadInventoryFromFile(productList);
+	loadInventoryFromFile(productList); 
 
 
 	char choice;
 	do {
-		cout << "Welcome to Bubble's  Cafe Inventory\n";
+		cout << "Welcome to Bubble's  Cafe  Inventory\n";
 		cout << "Menu\n\n";
 		cout << "A.Sales Report\n"
 			<< "B.Track sales and Update Inventory\n"
@@ -509,7 +619,7 @@ int main()
 		switch (toupper(choice))
 		{
 		case 'A':                                                                            //Call sales report function
-			generateSalesReport(salesHead, productList.head);
+			generateSalesReport(productList);
 			break;
 		case 'B':                                                                            // Track sales and update inventory                                              
 		{
@@ -520,10 +630,19 @@ int main()
 		}
 			break;
 		case 'C':
-
+		{
+			cout << "\n\n===========================================\n";
+			cout << "Update Product Information\n";
+			updateProduct(productList);
+			cout << "\n===========================================\n\n";
+		}
 			break;
 		case 'D':
-
+		{
+			cout << "\n\n===========================================\n";
+			addProduct(productList);
+			cout << "\n\n===========================================\n";
+		}
 			break;
 		case 'E':                                                                         // Call delete function
 		{
@@ -551,24 +670,30 @@ int main()
 		{
 			cout << "\n\n===========================================\n";
 			cout << "Displaying All Products:\n\n";
-			displayProducts(productList.head);
+			displayProducts(productList);
 			cout << "\n===========================================\n\n";
 		}
 			break;
 		case 'H':
-
+		{
+			saveInventoryToFile(productList);
+			loadInventoryFromFile(productList);
+		}
 			break;
 		case 'I':
-
+		{
+			cout << "\n\n===========================================\n";
+			cout << "Exiting Bubble's  Cafe Inventory\n";
+			cout << "\n\n===========================================\n";
+		}
 			break;
 		default:
 			cout << "Invalid. Please Enter a Valid Choice\n";
 			break;
 
 		}
-	} while (choice != 'I');
+	} while (toupper(choice != 'I'));
 
 	
 	return 0;
-
 }

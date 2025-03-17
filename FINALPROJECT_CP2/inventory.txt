@@ -1,10 +1,9 @@
---------------------------------------------------------
-Product Name   ID    Price    Stock   Supplier
---------------------------------------------------------
---------------------------------------------------------
-Syrup          106   100.00   20      Sweet Syrup Suppliers
-Ice            105   59.00    20      Cool Ice Suppliers  
-Chocolate      104   100.00   20      Choco Delights      
-Whipped Cream  103   100.00   21      WhipIt Industries   
-Milk           102   89.00    20      Dairy Fresh Ltd.    
-Coffee         101   120.00   10      Coffee Supplier Co. 
+Product Name        ID        Price     Stock     Supplier Name            Phone No.           
+-------------------------------------------------------------------------------------
+Vhea                109       1000.00   1         nadine                   8756476             
+Syrup               106       100.00    20        Sweet Syrup Suppliers    912345566           
+Ice                 105       59.00     20        Cool Ice Suppliers       998877665           
+Chocolate           104       100.00    20        Choco Delights           556677889           
+Whipped Cream       103       100.00    20        WhipIt Industries        112233445           
+Milk                102       79.00     20        Dairy Fresh Ltd.         987654321           
+Coffee              101       120.00    10        Coffee Supplier Co.      123456789           
