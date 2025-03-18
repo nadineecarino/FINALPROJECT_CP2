@@ -130,8 +130,8 @@ static void loadInventoryFromFile(ProductList& productList) {
 	}
 
 	string name;
-	int id = 0, stock = 0;
-	double price = 0.0, sales = 0.0;
+	int id, stock;
+	double price, sales;
 
 	while (getline(inFile, name, ',')) { 
 		inFile >> id;
